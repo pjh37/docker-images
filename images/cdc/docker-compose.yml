@@ -5,8 +5,7 @@ services:
     container_name: zookeeper
     ports:
       - "2181:2181"
-    networks:
-      - my_net
+      - "2888:2888"
   kafka:
     image: wurstmeister/kafka
     depends_on:
@@ -14,21 +13,27 @@ services:
     container_name: kafka
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
-#      KAFKA_ADVERTISED_HOST_NAME: 172.19.0.3
-      KAFKA_ADVERTISED_PORT: 9092
-      KAFKA_LISTENERS: PLAINTEXT://:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://:9092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+#      spring->kafka연결은됨 단 connector가 안됨
+#      KAFKA_LISTENERS: PLAINTEXT://:9092
+#      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     links:
       - zookeeper
-    networks:
-      - my_net
+
   mysql:
     image: mysql
     container_name: mysql
+    cap_add:
+      - SYS_NICE
     ports:
       - "3306:3306"
     environment:
@@ -38,19 +43,17 @@ services:
       MYSQL_PASSWORD: mysqlpw
     volumes:
       - D:/mysql/data:/var/lib/mysql
-    networks:
-      - my_net
+
   connector:
     image: debezium/connect
     depends_on:
       - kafka
       - mysql
-      - zookeeper
     ports:
       - "8083:8083"
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: 1
+      GROUP_ID: 4
       CONFIG_STORAGE_TOPIC: my_connect_configs
       OFFSET_STORAGE_TOPIC: my_connect_offsets
       STATUS_STORAGE_TOPIC: my_connect_statuses
@@ -58,9 +61,8 @@ services:
       - zookeeper
       - kafka
       - mysql
-    networks:
-      - my_net
 
-networks:
-  my_net:
-    driver: bridge
+#
+#networks:
+#  my_net:
+#    driver: bridge
